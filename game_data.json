@@ -1,0 +1,17 @@
+{
+  "waiting_players": [
+    "عقهب"
+  ],
+  "alive_players": [],
+  "dead_players": [],
+  "player_roles": {},
+  "player_teams": {},
+  "game_started": false,
+  "phase": "night",
+  "day_number": 1,
+  "global_chat": [],
+  "mafia_chat": [],
+  "narrator_history": [],
+  "submitted_actions": {},
+  "notifications": {}
+}
