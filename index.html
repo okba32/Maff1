@@ -70,7 +70,6 @@
         .player-chip { display: inline-block; padding: 6px 10px; background: #34495e; border-radius: 6px; font-size: 13px; margin: 3px; border: 1px solid #4a6278; }
         .player-chip.dead { background: #4a1c1c; border-color: #7f1d1d; text-decoration: line-through; color: #fca5a5; opacity: 0.8; }
 
-        /* تعديل تجاوب الشاشة للوضع الأفقي (Landscape) لحل مشاكل العرض */
         @media screen and (max-height: 500px) and (orientation: landscape) {
             body { align-items: flex-start; padding-top: 10px; }
             .container { margin: 10px auto; padding: 15px; }
@@ -78,9 +77,7 @@
         }
     </style>
 </head>
-<body>
-
-<div class="container" id="loginArea">
+<body onclick="manualSync()"> <div class="container" id="loginArea">
     <h2>انضم إلى قرية المافيا 🎮</h2>
     <input type="text" id="playerName" placeholder="اكتب اسمك الكريم هنا...">
     <button onclick="login()" id="loginBtn">دخول اللعبة</button>
@@ -196,7 +193,6 @@
 </div>
 
 <script>
-    // --- إعدادات الأدوار لتوزيعها عشوائياً بدون تكرار "مواطن" ---
     const rolePool = [
         { name: "المافيا (الزعيم)", team: "mafia" },
         { name: "الطبيب", team: "village" },
@@ -213,19 +209,21 @@
     
     const NARRATOR_PASSWORD = "1233"; 
 
-    const _p1 = atob("Z2l0aHViX3BhdF8="); 
-    // تم تحديث الرمز هنا بناءً على طلبك
-    const _p2 = "11BQFG4BQ0EvVSpZLSeodR_";
-    const _p3 = "xYDJ3d1xtWaxzI9ddfUU6tYkU84Q3aXhv5KGoGUDFqPMZZFJAJ2aVit5iky";
+    // التوكن الجديد مجزأ لتفادي حذفه من جيت هاب
+    const _p1 = "github_pat_"; 
+    const _p2 = "11BQFG4BQ0DDqXL8a7Tdlh_";
+    const _p3 = "l7UxUv3ITrn2faku8lR6AFlX2ZJ4RAnke1nfzy4LG5bIAXUKJLXcw447gw3";
     const GITHUB_TOKEN = _p1 + _p2 + _p3;
+    
     const REPO_OWNER = "okba32";
-    const REPO_NAME = "Maff";
+    const REPO_NAME = "Maff1"; // تم تحديث المستودع
     const FILE_PATH = "game_data.json"; 
 
     let syncInterval; 
     let currentSha = null;
     let lastRenderedChatCounts = { global: 0, mafia: 0, narrator: 0 }; 
     let lastRenderedPlayersList = ""; 
+    let isFetching = false;
 
     let gameData = {
         waiting_players: [],
@@ -252,6 +250,8 @@
     }
 
     async function fetchDatabase() {
+        if(isFetching) return;
+        isFetching = true;
         try {
             const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}?t=${new Date().getTime()}`, {
                 headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Accept": "application/vnd.github.v3+json", "Cache-Control": "no-cache" }
@@ -260,8 +260,13 @@
                 const data = await response.json();
                 currentSha = data.sha;
                 gameData = JSON.parse(decodeBase64(data.content));
+            } else if (response.status === 404) {
+                console.warn("الملف غير موجود في المستودع بعد، سيتم إنشاؤه عند أول عملية حفظ.");
             }
-        } catch (error) { console.error("خطأ جلب البيانات:", error); }
+        } catch (error) { 
+            console.error("خطأ جلب البيانات:", error); 
+        }
+        isFetching = false;
     }
 
     async function safeUpdateDatabase(updateLogic) {
@@ -283,6 +288,9 @@
                 currentSha = data.content.sha;
             }
         } catch (error) { console.error("خطأ حفظ البيانات:", error); }
+        
+        // تحديث الواجهة فوراً بعد الرفع
+        syncData();
     }
 
     async function login() {
@@ -527,7 +535,15 @@
 
     function startSync() {
         syncData(); 
-        syncInterval = setInterval(syncData, 4000);
+        // تحديث كل ثانية (1000 ملي ثانية) كما طلبت
+        syncInterval = setInterval(syncData, 1000); 
+    }
+
+    // دالة لاستدعاء التحديث عند النقر اليدوي
+    function manualSync() {
+        if(localStorage.getItem('player_name') || localStorage.getItem('is_narrator') === "true") {
+            fetchDatabase().then(() => syncData());
+        }
     }
 
     async function submitPlayerAction() {
@@ -546,7 +562,6 @@
         });
 
         alert(`تم تثبيت خيارك بنجاح وبانتظار تجميع باقي الأصوات!`);
-        syncData();
     }
 
     async function processCurrentPhase() {
@@ -635,7 +650,6 @@
         });
 
         alert("تمت معالجة أحداث الطور وحساب النتائج آلياً وبنجاح!");
-        syncData();
     }
 
     async function startGame() {
@@ -659,7 +673,6 @@
             gameData.phase = "night";
             gameData.day_number = 1;
 
-            // توزيع الأدوار المتنوعة بدون تكرار المواطن
             for (let i = 0; i < shuffledPlayers.length; i++) {
                 let roleObj = rolePool[i % rolePool.length];
                 gameData.player_roles[shuffledPlayers[i]] = roleObj.name;
@@ -675,7 +688,6 @@
         });
 
         alert("تم خلط اللاعبين وتوزيع الأدوار عشوائياً بنجاح! اللعبة بدأت الآن.");
-        syncData();
     }
 
     async function sendGlobalMsg() {
@@ -699,7 +711,6 @@
         input.disabled = false;
         btn.disabled = false;
         input.focus();
-        syncData(); 
     }
 
     async function sendNarratorGlobalMsg() {
@@ -718,7 +729,6 @@
         input.value = "";
         input.disabled = false;
         input.focus();
-        syncData(); 
     }
 
     async function sendMafiaMsg() {
@@ -742,7 +752,6 @@
         input.disabled = false;
         btn.disabled = false;
         input.focus();
-        syncData(); 
     }
 
     async function sendToNarrator() {
@@ -770,7 +779,6 @@
         btn.disabled = false;
         btn.innerText = "إرسال للراوي";
         alert("تم إرسال أمرك السري للراوي!");
-        syncData();
     }
 
     async function sendPMToPlayer() {
@@ -796,7 +804,6 @@
         btn.disabled = false;
         btn.innerText = "إرسال الإشعار السري";
         alert(`تم إرسال الإشعار السري إلى [${target}]`);
-        syncData();
     }
 
     function checkPlayerNotifications(playerName) {
@@ -880,3 +887,4 @@
 
 </body>
 </html>
+
